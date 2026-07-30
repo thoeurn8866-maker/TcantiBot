@@ -141,7 +141,7 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            await asyncio.sleep(10)
+            await asyncio.sleep(60)
             await ban_msg.delete()
 
     except Exception as e:
