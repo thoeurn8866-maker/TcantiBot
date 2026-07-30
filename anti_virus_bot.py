@@ -15,7 +15,7 @@ web_app = Flask('')
 
 @web_app.route('/')
 def home():
-    return "Anti-Virus Group Bot is Active!"
+    return "Anti-Virus & Group Protection Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -28,7 +28,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# 🚫 ប្រភេទ File ដែលចាត់ទុកជាមេរោគ/ហានិភ័យ
+# 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
     '.exe', '.apk', '.vbs', '.bat', '.cmd', '.scr', 
     '.js', '.zip', '.rar', '.iso', '.ps1', '.msi'
@@ -36,6 +36,9 @@ DANGEROUS_EXTENSIONS = (
 
 # 🚫 Regex ចាប់ Link ស្ពែម
 URL_REGEX = r"(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})"
+
+# 🚫 បញ្ជីពាក្យអាក្រក់/អាសអាភាស (អាចបន្ថែមពាក្យផ្សេងៗទៀតបាន)
+BAD_WORDS = ['អាសអាភាស', 'ក្ត', 'ចដ', 'ចុយ', 'សិច', 'sex', 'porn', 'nude', 'xxx']
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """ ពិនិត្យមើលថាអ្នកផ្ញើជា Admin ឬអត់ """
@@ -51,51 +54,68 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         logging.error(f"Error checking admin status: {e}")
         return False
 
+async def kick_and_clean(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str):
+    """ មុខងារលុបសារ និង Remove (Ban) អ្នកផ្ញើចេញពី Group """
+    message = update.message
+    chat_id = update.effective_chat.id
+    user_id = message.from_user.id
+    user_name = message.from_user.full_name
+
+    try:
+        # 1. លុបសារដែលខុសច្បាប់ចោល
+        await message.delete()
+
+        # 2. Ban (Remove) សមាជិកនោះចេញពី Group ភ្លាមៗ
+        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+
+        # 3. ផ្ញើសារប្រកាសក្នុង Group
+        warn = await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"🚫 **ប្រព័ន្ធបាន Remove {user_name} ចេញពី Group!**\n"
+                 f"📌 **មូលហេតុ៖** {reason}"
+        )
+        await asyncio.sleep(8)
+        await warn.delete()
+
+    except Exception as e:
+        logging.error(f"Failed to kick user or delete message: {e}")
+
 async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ ស្កែន និងលុបទាំង File មេរោគ និង Link ស្ពែម """
+    """ ស្កែនមើលរាល់សារទាំងអស់ដែលផ្ញើចូល Group """
     message = update.message
     if not message:
         return
 
-    # ប្រសិនបើ Admin ជាអ្នកផ្ញើ មិនលុបទេ
+    # ប្រសិនបើ Admin ជាអ្នកផ្ញើ មិនចាត់វិធានការទេ
     if await is_admin(update, context):
         return
 
-    user_name = message.from_user.full_name if message.from_user else "សមាជិក"
-    
-    # 1. ស្កែន និងលុប File មេរោគ (Document)
+    text_content = message.text or message.caption or ""
+
+    # 1. ស្កែន File មេរោគ (.exe, .apk...)
     if message.document:
         file_name = message.document.file_name.lower() if message.document.file_name else ""
         if file_name.endswith(DANGEROUS_EXTENSIONS):
-            try:
-                await message.delete()
-                warn = await context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"⚠️ **សារប្រុងប្រយ័ត្ន!**\nសូមទោស {user_name}! ប្រព័ន្ធបានលុបឯកសារ `{file_name}` ព្រោះវាជាប្រភេទ File មានហានិភ័យ/មេរោគ។(ការិយាល័យបុគ្គលិក ទូរសព្ទ 123)"
-                )
-                await asyncio.sleep(8)
-                await warn.delete()
-                return
-            except Exception as e:
-                logging.error(f"Failed to delete virus file: {e}")
-
-    # 2. ស្កែន និងលុប Link ស្ពែម (អត្ថបទធម្មតា ឬ Caption លើរូបភាព/វីដេអូ)
-    text_content = message.text or message.caption or ""
-    if re.search(URL_REGEX, text_content):
-        try:
-            await message.delete()
-            warn = await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"🚫 **សូមទោស {user_name}!**\nសមាជិកមិនត្រូវអនុញ្ញាតឱ្យផ្ញើ Link ចូលក្នុង Group ឡើយ។"
-            )
-            await asyncio.sleep(8)
-            await warn.delete()
+            await kick_and_clean(update, context, f"ផ្ញើ File មានហានិភ័យ/មេរោគ (`{file_name}`)")
             return
-        except Exception as e:
-            logging.error(f"Failed to delete link: {e}")
+
+    # 2. ស្កែន Link ស្ពែម
+    if re.search(URL_REGEX, text_content):
+        await kick_and_clean(update, context, "ផ្ញើ Link ស្ពែមចូលក្នុង Group")
+        return
+
+    # 3. ស្កែនពាក្យអាសអាភាស
+    if any(bad_word in text_content.lower() for bad_word in BAD_WORDS):
+        await kick_and_clean(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
+        return
+
+    # 4. ចាប់លុបរូបភាព និង វីដេអូ (ប្រសិនបើមិនចង់ឱ្យសមាជិកផ្ញើរូប/វីដេអូផ្តេសផ្តាស)
+    if message.photo or message.video or message.animation:
+        await kick_and_clean(update, context, "ផ្ញើរូបភាព/វីដេអូ ដោយគ្មានការអនុញ្ញាត")
+        return
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🛡️ Anti-Virus & Anti-Spam Bot កំពុងដំណើរការការពារ Group របស់អ្នក!")
+    await update.message.reply_text("🛡️ Anti-Virus & Protection Bot កំពុងការពារ Group របស់អ្នក!")
 
 async def main():
     # ⚠️ ជំនួស API TOKEN របស់ Anti-Virus Bot នៅទីនេះ
@@ -105,7 +125,6 @@ async def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # ចាប់ស្កែនរាល់ Message ទាំងអស់ដែលផ្ញើចូល Group
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, monitor_messages))
     app.add_handler(CommandHandler('start', start))
 
