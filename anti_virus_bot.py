@@ -99,7 +99,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def main():
     # ⚠️ ជំនួស API TOKEN របស់ Anti-Virus Bot នៅទីនេះ
-    TOKEN = 'YOUR_ANTIVIRUS_BOT_TOKEN_HERE'
+    TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
 
     threading.Thread(target=run_flask, daemon=True).start()
 
