@@ -175,12 +175,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if any(bad_word in text_content.lower() for bad_word in BAD_WORDS):
         await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
         return
-
-    # 4. ស្កែនរូបភាព និង វីដេអូ
-    if message.photo or message.video or message.animation:
-        await process_violation(update, context, "ផ្ញើរូបភាព/វីដេអូ ដោយគ្មានការអនុញ្ញាត")
-        return
-
+   
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛡️ Anti-Virus & Protection Bot កំពុងការពារ Group របស់អ្នក!")
 
