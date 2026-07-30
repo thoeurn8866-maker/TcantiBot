@@ -71,7 +71,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await message.delete()
                 warn = await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=f"⚠️ **សារប្រុងប្រយ័ត្ន!**\nសូមទោស {user_name}! ប្រព័ន្ធបានលុបឯកសារ `{file_name}` ព្រោះវាជាប្រភេទ File មានហានិភ័យ/មេរោគ។"
+                    text=f"⚠️ **សារប្រុងប្រយ័ត្ន!**\nសូមទោស {user_name}! ប្រព័ន្ធបានលុបឯកសារ `{file_name}` ព្រោះវាជាប្រភេទ File មានហានិភ័យ/មេរោគ។(ការិយាល័យបុគ្គលិក ទូរសព្ទ 123)"
                 )
                 await asyncio.sleep(8)
                 await warn.delete()
