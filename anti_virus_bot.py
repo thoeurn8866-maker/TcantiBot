@@ -15,7 +15,7 @@ web_app = Flask('')
 
 @web_app.route('/')
 def home():
-    return "Anti-Virus & Group Protection Bot is Active!"
+    return "Anti-Virus & Warning System Bot is Active!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -37,8 +37,11 @@ DANGEROUS_EXTENSIONS = (
 # 🚫 Regex ចាប់ Link ស្ពែម
 URL_REGEX = r"(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})"
 
-# 🚫 បញ្ជីពាក្យអាក្រក់/អាសអាភាស (អាចបន្ថែមពាក្យផ្សេងៗទៀតបាន)
+# 🚫 បញ្ជីពាក្យអាក្រក់/អាសអាភាស
 BAD_WORDS = ['អាសអាភាស', 'ក្ត', 'ចដ', 'ចុយ', 'សិច', 'sex', 'porn', 'nude', 'xxx']
+
+# 📌 កន្លែងផ្ទុកចំនួនដងនៃការព្រមានសមាជិក (Memory Dictionary)
+user_warnings = {}
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """ ពិនិត្យមើលថាអ្នកផ្ញើជា Admin ឬអត់ """
@@ -54,31 +57,50 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         logging.error(f"Error checking admin status: {e}")
         return False
 
-async def kick_and_clean(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str):
-    """ មុខងារលុបសារ និង Remove (Ban) អ្នកផ្ញើចេញពី Group """
+async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str):
+    """ មុខងារគ្រប់គ្រងការព្រមាន និង Remove សមាជិក """
     message = update.message
     chat_id = update.effective_chat.id
     user_id = message.from_user.id
     user_name = message.from_user.full_name
 
     try:
-        # 1. លុបសារដែលខុសច្បាប់ចោល
+        # 1. លុបសារដែលល្មើសច្បាប់ចោលភ្លាមៗ
         await message.delete()
 
-        # 2. Ban (Remove) សមាជិកនោះចេញពី Group ភ្លាមៗ
-        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+        # 2. បូកចំនួនដងនៃការព្រមាន
+        current_warns = user_warnings.get(user_id, 0) + 1
+        user_warnings[user_id] = current_warns
 
-        # 3. ផ្ញើសារប្រកាសក្នុង Group
-        warn = await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"🚫 **ប្រព័ន្ធបាន Remove {user_name} ចេញពី Group!**\n"
-                 f"📌 **មូលហេតុ៖** {reason}"
-        )
-        await asyncio.sleep(8)
-        await warn.delete()
+        if current_warns < 3:
+            # 🔔 ព្រមានលើកទី ១ និង ទី ២
+            warn_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️ **សារព្រមានលើកទី {current_warns}/3!**\n"
+                     f"👤 **សមាជិក៖** {user_name}\n"
+                     f"📌 **មូលហេតុ៖** {reason}\n\n"
+                     f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!)*"
+            )
+            await asyncio.sleep(10)
+            await warn_msg.delete()
+
+        else:
+            # 🚫 លើកទី ៣៖ Kick/Ban ចេញពី Group តែម្តង
+            await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
+            
+            # Reset ការព្រមានរបស់គាត់
+            user_warnings.pop(user_id, None)
+
+            ban_msg = await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"🚫 **បាន Remove {user_name} ចេញពី Group!**\n"
+                     f"📌 **មូលហេតុ៖** ទទួលបានការព្រមានគ្រប់ ៣ ដង ({reason})"
+            )
+            await asyncio.sleep(10)
+            await ban_msg.delete()
 
     except Exception as e:
-        logging.error(f"Failed to kick user or delete message: {e}")
+        logging.error(f"Error processing violation: {e}")
 
 async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ ស្កែនមើលរាល់សារទាំងអស់ដែលផ្ញើចូល Group """
@@ -96,22 +118,22 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message.document:
         file_name = message.document.file_name.lower() if message.document.file_name else ""
         if file_name.endswith(DANGEROUS_EXTENSIONS):
-            await kick_and_clean(update, context, f"ផ្ញើ File មានហានិភ័យ/មេរោគ (`{file_name}`)")
+            await process_violation(update, context, f"ផ្ញើ File មានហានិភ័យ/មេរោគ (`{file_name}`)")
             return
 
     # 2. ស្កែន Link ស្ពែម
     if re.search(URL_REGEX, text_content):
-        await kick_and_clean(update, context, "ផ្ញើ Link ស្ពែមចូលក្នុង Group")
+        await process_violation(update, context, "ផ្ញើ Link ស្ពែមចូលក្នុង Group")
         return
 
     # 3. ស្កែនពាក្យអាសអាភាស
     if any(bad_word in text_content.lower() for bad_word in BAD_WORDS):
-        await kick_and_clean(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
+        await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
         return
 
-    # 4. ចាប់លុបរូបភាព និង វីដេអូ (ប្រសិនបើមិនចង់ឱ្យសមាជិកផ្ញើរូប/វីដេអូផ្តេសផ្តាស)
+    # 4. ស្កែនរូបភាព និង វីដេអូ
     if message.photo or message.video or message.animation:
-        await kick_and_clean(update, context, "ផ្ញើរូបភាព/វីដេអូ ដោយគ្មានការអនុញ្ញាត")
+        await process_violation(update, context, "ផ្ញើរូបភាព/វីដេអូ ដោយគ្មានការអនុញ្ញាត")
         return
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
