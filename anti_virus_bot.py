@@ -31,7 +31,7 @@ logging.basicConfig(
 
 # 🔑 Log System Configuration
 # ⚠️ ជំនួស ID របស់ Admin ឬ Log Channel/Group នៅទីនេះ (យកពី @userinfobot)
-LOG_CHAT_ID = -8950817942  # ឧទាហរណ៍៖ -1001234567890 ឬ ID ផ្ទាល់ខ្លួន 123456789
+LOG_CHAT_ID = 2127600841  # ឧទាហរណ៍៖ -1001234567890 ឬ ID ផ្ទាល់ខ្លួន 123456789
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
