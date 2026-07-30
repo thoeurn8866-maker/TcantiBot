@@ -3,6 +3,7 @@ import re
 import asyncio
 import threading
 import logging
+from datetime import datetime  # ថែមសម្រាប់ទាញយកម៉ោងផ្ញើ Log
 from flask import Flask
 from telegram import Update
 from telegram.ext import (
@@ -28,6 +29,10 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# 🔑 Log System Configuration
+# ⚠️ ជំនួស ID របស់ Admin ឬ Log Channel/Group នៅទីនេះ (យកពី @userinfobot)
+LOG_CHAT_ID = -8950817942  # ឧទាហរណ៍៖ -1001234567890 ឬ ID ផ្ទាល់ខ្លួន 123456789
+
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
     '.exe', '.apk', '.vbs', '.bat', '.cmd', '.scr', 
@@ -42,6 +47,18 @@ BAD_WORDS = ['អាសអាភាស', 'ក្ត', 'ចដ', 'ចុយ', '�
 
 # 📌 កន្លែងផ្ទុកចំនួនដងនៃការព្រមានសមាជិក (Memory Dictionary)
 user_warnings = {}
+
+async def send_log_to_admin(context: ContextTypes.DEFAULT_TYPE, log_message: str):
+    """ មុខងារផ្ញើ Log Report ទៅកាន់ Admin/Channel (ថែមថ្មី) """
+    if LOG_CHAT_ID and LOG_CHAT_ID != -1001234567890:
+        try:
+            await context.bot.send_message(
+                chat_id=LOG_CHAT_ID, 
+                text=log_message, 
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logging.error(f"Failed to send log to admin: {e}")
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """ ពិនិត្យមើលថាអ្នកផ្ញើជា Admin ឬអត់ """
@@ -58,11 +75,15 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         return False
 
 async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, reason: str):
-    """ មុខងារគ្រប់គ្រងការព្រមាន និង Remove សមាជិក """
+    """ មុខងារគ្រប់គ្រងការព្រមាន, Remove សមាជិក និងផ្ញើ Log """
     message = update.message
     chat_id = update.effective_chat.id
-    user_id = message.from_user.id
-    user_name = message.from_user.full_name
+    chat_title = update.effective_chat.title or "Private Chat"
+    user = message.from_user
+    user_id = user.id
+    user_name = user.full_name
+    user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
+    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         # 1. លុបសារដែលល្មើសច្បាប់ចោលភ្លាមៗ
@@ -81,6 +102,18 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                      f"📌 **មូលហេតុ៖** {reason}\n\n"
                      f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!(បំណងល្អពីការិយាល័យបុគ្គលិក ទូរសព្ទ៖123))*"
             )
+
+            # 📩 ផ្ញើ Log រាយការណ៍ការព្រមានទៅ Admin (ថែមថ្មី)
+            log_text = (
+                f"⚠️ **[LOG REPORT] ការព្រមានសមាជិក ({current_warns}/3)**\n"
+                f"👥 **Group:** {chat_title}\n"
+                f"👤 **សមាជិក:** {user_name} ({user_handle})\n"
+                f"🆔 **User ID:** `{user_id}`\n"
+                f"📌 **មូលហេតុ:** {reason}\n"
+                f"⏰ **ពេល៖** {time_str}"
+            )
+            await send_log_to_admin(context, log_text)
+
             await asyncio.sleep(10)
             await warn_msg.delete()
 
@@ -96,6 +129,18 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 text=f"🚫 **បាន Remove {user_name} ចេញពី Group!**\n"
                      f"📌 **មូលហេតុ៖** ទទួលបានការព្រមានគ្រប់ ៣ ដង ({reason})"
             )
+
+            # 🚨 ផ្ញើ Log រាយការណ៍ពីការ BAN/REMOVE ទៅ Admin (ថែមថ្មី)
+            log_text = (
+                f"🚨 **[LOG REPORT] បាន REMOVE / BAN សមាជិក!**\n"
+                f"👥 **Group:** {chat_title}\n"
+                f"👤 **សមាជិក:** {user_name} ({user_handle})\n"
+                f"🆔 **User ID:** `{user_id}`\n"
+                f"📌 **មូលហេតុ៖** ល្មើសបទបញ្ជាគ្រប់ {current_warns} ដង ({reason})\n"
+                f"⏰ **ពេល៖** {time_str}"
+            )
+            await send_log_to_admin(context, log_text)
+
             await asyncio.sleep(10)
             await ban_msg.delete()
 
