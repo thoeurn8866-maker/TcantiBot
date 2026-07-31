@@ -3,7 +3,8 @@ import re
 import asyncio
 import threading
 import logging
-from datetime import datetime  # ថែមសម្រាប់ទាញយកម៉ោងផ្ញើ Log
+from datetime import datetime
+import pytz  # 🇰🇭 Import Timezone សម្រាប់កំណត់ម៉ោងនៅកម្ពុជា
 from flask import Flask
 from telegram import Update
 from telegram.ext import (
@@ -30,8 +31,7 @@ logging.basicConfig(
 )
 
 # 🔑 Log System Configuration
-# ⚠️ ជំនួស ID របស់ Admin ឬ Log Channel/Group នៅទីនេះ (យកពី @userinfobot)
-LOG_CHAT_ID = 2127600841  # ឧទាហរណ៍៖ -1001234567890 ឬ ID ផ្ទាល់ខ្លួន 123456789
+LOG_CHAT_ID = 2127600841  # ID របស់ Admin ឬ Log Channel/Group
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
@@ -45,11 +45,15 @@ URL_REGEX = r"(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})"
 # 🚫 បញ្ជីពាក្យអាក្រក់/អាសអាភាស
 BAD_WORDS = ['អាសអាភាស', 'ក្ត', 'ចដ', 'ចុយ', 'សិច', 'sex', 'porn', 'nude', 'xxx']
 
-# 📌 កន្លែងផ្ទុកចំនួនដងនៃការព្រមានសមាជិក (Memory Dictionary)
+# 📌 កន្លែងផ្ទុកចំនួនដងនៃការព្រមាន និងប្រវត្តិផ្ញើ File/រូបភាព
 user_warnings = {}
+sent_files_history = {} # Format: {file_unique_id: date_string}
+
+# 🇰🇭 កំណត់ Timezone កម្ពុជា (Phnom Penh)
+CAMBODIA_TZ = pytz.timezone('Asia/Phnom_Penh')
 
 async def send_log_to_admin(context: ContextTypes.DEFAULT_TYPE, log_message: str):
-    """ មុខងារផ្ញើ Log Report ទៅកាន់ Admin/Channel (ថែមថ្មី) """
+    """ មុខងារផ្ញើ Log Report ទៅកាន់ Admin/Channel """
     if LOG_CHAT_ID and LOG_CHAT_ID != -1001234567890:
         try:
             await context.bot.send_message(
@@ -83,7 +87,9 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_id = user.id
     user_name = user.full_name
     user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
-    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # 🇰🇭 ម៉ោង និងកាលបរិច្ឆេទត្រឹមត្រូវតាមប្រទេសកម្ពុជា
+    time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         # 1. លុបសារដែលល្មើសច្បាប់ចោលភ្លាមៗ
@@ -103,14 +109,14 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                      f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!(បំណងល្អពីការិយាល័យបុគ្គលិក ទូរសព្ទ៖123))*"
             )
 
-            # 📩 ផ្ញើ Log រាយការណ៍ការព្រមានទៅ Admin (ថែមថ្មី)
+            # 📩 ផ្ញើ Log រាយការណ៍ការព្រមានទៅ Admin
             log_text = (
                 f"⚠️ **[LOG REPORT] ការព្រមានសមាជិក ({current_warns}/3)**\n"
                 f"👥 **Group:** {chat_title}\n"
                 f"👤 **សមាជិក:** {user_name} ({user_handle})\n"
                 f"🆔 **User ID:** `{user_id}`\n"
                 f"📌 **មូលហេតុ:** {reason}\n"
-                f"⏰ **ពេល៖** {time_str}"
+                f"⏰ **ពេល (កម្ពុជា):** {time_str}"
             )
             await send_log_to_admin(context, log_text)
 
@@ -130,14 +136,14 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                      f"📌 **មូលហេតុ៖** ទទួលបានការព្រមានគ្រប់ ៣ ដង ({reason})"
             )
 
-            # 🚨 ផ្ញើ Log រាយការណ៍ពីការ BAN/REMOVE ទៅ Admin (ថែមថ្មី)
+            # 🚨 ផ្ញើ Log រាយការណ៍ពីការ BAN/REMOVE ទៅ Admin
             log_text = (
                 f"🚨 **[LOG REPORT] បាន REMOVE / BAN សមាជិក!**\n"
                 f"👥 **Group:** {chat_title}\n"
                 f"👤 **សមាជិក:** {user_name} ({user_handle})\n"
                 f"🆔 **User ID:** `{user_id}`\n"
                 f"📌 **មូលហេតុ៖** ល្មើសបទបញ្ជាគ្រប់ {current_warns} ដង ({reason})\n"
-                f"⏰ **ពេល៖** {time_str}"
+                f"⏰ **ពេល (កម្ពុជា):** {time_str}"
             )
             await send_log_to_admin(context, log_text)
 
@@ -158,29 +164,48 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     text_content = message.text or message.caption or ""
+    
+    # 🇰🇭 ថ្ងៃខែបច្ចុប្បន្នតាមម៉ោងកម្ពុជា
+    today_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d")
 
-    # 1. ស្កែន File មេរោគ (.exe, .apk...)
+    # 1. ស្កែន File/រូបភាព/វីដេអូ ដដែលៗក្នុងថ្ងៃតែមួយ (Duplicate Check)
+    file_unique_id = None
+    if message.document:
+        file_unique_id = message.document.file_unique_id
+    elif message.photo:
+        file_unique_id = message.photo[-1].file_unique_id
+    elif message.video:
+        file_unique_id = message.video.file_unique_id
+
+    if file_unique_id:
+        if file_unique_id in sent_files_history and sent_files_history[file_unique_id] == today_str:
+            await process_violation(update, context, "ផ្ញើរូបភាព ឬ ឯកសារដដែលៗ (Spam) ក្នុងថ្ងៃតែមួយ")
+            return
+        else:
+            sent_files_history[file_unique_id] = today_str
+
+    # 2. ស្កែន File មេរោគ (.exe, .apk...)
     if message.document:
         file_name = message.document.file_name.lower() if message.document.file_name else ""
         if file_name.endswith(DANGEROUS_EXTENSIONS):
             await process_violation(update, context, f"ផ្ញើ File មានហានិភ័យ/មេរោគ (`{file_name}`)")
             return
 
-    # 2. ស្កែន Link ស្ពែម
+    # 3. ស្កែន Link ស្ពែម
     if re.search(URL_REGEX, text_content):
         await process_violation(update, context, "ផ្ញើ Link ស្ពែមចូលក្នុង Group")
         return
 
-    # 3. ស្កែនពាក្យអាសអាភាស
+    # 4. ស្កែនពាក្យអាសអាភាស
     if any(bad_word in text_content.lower() for bad_word in BAD_WORDS):
         await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
         return
-   
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛡️ Anti-Virus & Protection Bot កំពុងការពារ Group របស់អ្នក!")
 
 async def main():
-    # ⚠️ ជំនួស API TOKEN របស់ Anti-Virus Bot នៅទីនេះ
+    # ⚠️ API TOKEN របស់ Bot
     TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
 
     threading.Thread(target=run_flask, daemon=True).start()
