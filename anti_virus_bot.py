@@ -88,6 +88,9 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_name = user.full_name
     user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
     
+    # 🔔 បង្កើត Link Mention Tag ចំឈ្មោះសាមីខ្លួន ឱ្យលោត Notification លើអេក្រង់ទូរសព្ទគាត់
+    user_mention = f"[{user_name}](tg://user?id={user_id})"
+
     # 🇰🇭 ម៉ោង និងកាលបរិច្ឆេទត្រឹមត្រូវតាមប្រទេសកម្ពុជា
     time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -100,14 +103,16 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         user_warnings[user_id] = current_warns
 
         if current_warns < 3:
-            # 🔔 ព្រមានលើកទី ១ និង ទី ២
+            # 🔔 ព្រមានលើកទី ១ និង ទី ២ (Tag Mention ទៅសាមីខ្លួន)
             warn_msg = await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"⚠️ **សារព្រមានលើកទី {current_warns}/3!**\n"
-                     f"👤 **សមាជិក៖** {user_name}\n"
-                     f"📌 **មូលហេតុ៖** {reason}\n\n"
+                text=f"⚠️ **សារព្រមានលើកទី {current_warns}/3!**\n\n"
+                     f"🔔 **ជូនចំពោះសមាជិក៖** {user_mention}\n"
+                     f"📌 **មូលហេតុ៖** {reason}\n"
+                     f"⏰ **កាលបរិច្ឆេទ៖** {time_str}\n\n"
                      f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!)*\n"
-                     f"*(នាយកដ្ឋានរដ្ឋបាលនិងធនធានមនុស្សនៃទូរគមនាគមន៍កម្ពុជា)*"
+                     f"*(នាយកដ្ឋានរដ្ឋបាលនិងធនធានមនុស្សនៃទូរគមនាគមន៍កម្ពុជា)*",
+                parse_mode='Markdown'
             )
 
             # 📩 ផ្ញើ Log រាយការណ៍ការព្រមានទៅ Admin
@@ -121,7 +126,8 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            await asyncio.sleep(60)
+            # ⏱️ រង់ចាំ ១២០ វិនាទី (២ នាទី) ទើបលុបសារព្រមានចោល
+            await asyncio.sleep(120)
             await warn_msg.delete()
 
         else:
@@ -131,10 +137,14 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             # Reset ការព្រមានរបស់គាត់
             user_warnings.pop(user_id, None)
 
+            # 🔔 ផ្ញើសារប្រកាស Remove ក្នុង Group (Tag Mention ទៅសាមីខ្លួន)
             ban_msg = await context.bot.send_message(
                 chat_id=chat_id,
-                text=f"🚫 **បាន Remove {user_name} ចេញពី Group!**\n"
-                     f"📌 **មូលហេតុ៖** ទទួលបានការព្រមានគ្រប់ ៣ ដង ({reason})"
+                text=f"🚫 **ប្រព័ន្ធបាន Remove {user_mention} ចេញពី Group!**\n\n"
+                     f"📌 **មូលហេតុ៖** ទទួលបានការព្រមានគ្រប់ ៣ ដង ({reason})\n"
+                     f"⏰ **កាលបរិច្ឆេទ៖** {time_str}\n\n"
+                     f"*(នាយកដ្ឋានរដ្ឋបាលនិងធនធានមនុស្សនៃទូរគមនាគមន៍កម្ពុជា)*",
+                parse_mode='Markdown'
             )
 
             # 🚨 ផ្ញើ Log រាយការណ៍ពីការ BAN/REMOVE ទៅ Admin
@@ -148,6 +158,7 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
+            # ⏱️ រង់ចាំ ១២០ វិនាទី (២ នាទី) ទើបលុបសារ Remove ចោល
             await asyncio.sleep(120)
             await ban_msg.delete()
 
