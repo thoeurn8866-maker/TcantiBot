@@ -32,7 +32,7 @@ logging.basicConfig(
 
 # 🔑 Configuration System
 LOG_CHAT_ID = 2127600841  # ID របស់ Log Channel/Group សម្រាប់រាយការណ៍ការល្មើស
-DOCS_ARCHIVE_CHANNEL_ID = -1004493775116  # ⚠️ ដាក់ ID របស់ Archive Channel (Private Channel) របស់បងនៅទីនេះ
+DOCS_ARCHIVE_CHANNEL_ID = -1004493775116  # ID របស់ Archive Channel របស់បង
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
@@ -80,24 +80,26 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         return False
 
 async def auto_archive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ 📁 មុខងារប្រមូល និងរក្សាទុកឯកសារស្វ័យប្រវត្តិក្នុង Archive Channel (Silent Storage) """
+    """ 📁 មុខងារប្រមូល និងរក្សាទុកតែ File ឯកសារស្វ័យប្រវត្តិក្នុង Archive Channel (Silent Storage) """
     message = update.message
     
-    # ប្រសិនបើ Archive Channel ID មិនទាន់បានកំណត់ មិនធ្វើការទេ
-    if not ARCHIVE_CHANNEL_ID or ARCHIVE_CHANNEL_ID == -1001234567890:
+    # ✅ កែប្រែឈ្មោះ Variable ឱ្យត្រូវគ្នាជាមួយ DOCS_ARCHIVE_CHANNEL_ID
+    if not DOCS_ARCHIVE_CHANNEL_ID or DOCS_ARCHIVE_CHANNEL_ID == -1001234567890:
         return
 
-    # ពិនិត្យមើលថាតើសារនោះជា Document, Photo, Video, Voice, ឬ Audio
-    if message.document or message.photo or message.video or message.audio or message.voice:
+    # ✅ ចាប់យកតែសារណាដែលជា File Document តែប៉ុណ្ណោះ (Word, Excel, PDF, ផ្សេងៗ)
+    if message.document:
         user = message.from_user
         user_name = user.full_name
         user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
         chat_title = update.effective_chat.title or "Group"
         time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+        file_name = message.document.file_name or "ឯកសារគ្មានឈ្មោះ"
 
         # បង្កើតអត្ថបទព័ត៌មានភ្ជាប់ជាមួយ File ក្នុង Archive Channel
         archive_caption = (
-            f"📥 **[ARCHIVE FILE REPORT]**\n\n"
+            f"📄 **[ប្រមូលឯកសារស្វ័យប្រវត្តិ]**\n\n"
+            f"📁 **ឈ្មោះ File៖** `{file_name}`\n"
             f"👥 **Group៖** {chat_title}\n"
             f"👤 **អ្នកផ្ញើ៖** {user_name} ({user_handle})\n"
             f"🆔 **User ID៖** `{user.id}`\n"
@@ -108,11 +110,11 @@ async def auto_archive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             # 🤫 Copy ឯកសារផ្ញើទៅកាន់ Archive Channel ដោយស្ងាត់ៗ (Silent)
             await message.copy(
-                chat_id=ARCHIVE_CHANNEL_ID,
+                chat_id=DOCS_ARCHIVE_CHANNEL_ID,
                 caption=archive_caption,
                 parse_mode='Markdown'
             )
-            logging.info(f"Successfully archived file from user {user.id}")
+            logging.info(f"Successfully archived document {file_name} from user {user.id}")
         except Exception as e:
             logging.error(f"Failed to copy file to Archive Channel: {e}")
 
@@ -126,22 +128,16 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_name = user.full_name
     user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
     
-    # 🔔 បង្កើត Link Mention Tag ចំឈ្មោះសាមីខ្លួន ឱ្យលោត Notification
     user_mention = f"[{user_name}](tg://user?id={user_id})"
-
-    # 🇰🇭 ម៉ោង និងកាលបរិច្ឆេទត្រឹមត្រូវតាមប្រទេសកម្ពុជា
     time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        # 1. លុបសារដែលល្មើសច្បាប់ចោលភ្លាមៗ
         await message.delete()
 
-        # 2. បូកចំនួនដងនៃការព្រមាន
         current_warns = user_warnings.get(user_id, 0) + 1
         user_warnings[user_id] = current_warns
 
         if current_warns < 3:
-            # 🔔 ព្រមានលើកទី ១ និង ទី ២ (Tag Mention ទៅសាមីខ្លួន)
             warn_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"⚠️ **សារព្រមានលើកទី {current_warns}/3!**\n\n"
@@ -153,7 +149,6 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 parse_mode='Markdown'
             )
 
-            # 📩 ផ្ញើ Log រាយការណ៍ការព្រមានទៅ Admin
             log_text = (
                 f"⚠️ **[LOG REPORT] ការព្រមានសមាជិក ({current_warns}/3)**\n"
                 f"👥 **Group:** {chat_title}\n"
@@ -164,18 +159,13 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            # ⏱️ រង់ចាំ ១២០ វិនាទី (២ នាទី) ទើបលុបសារព្រមានចោល
             await asyncio.sleep(120)
             await warn_msg.delete()
 
         else:
-            # 🚫 លើកទី ៣៖ Kick/Ban ចេញពី Group តែម្តង
             await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id)
-            
-            # Reset ការព្រមានរបស់គាត់
             user_warnings.pop(user_id, None)
 
-            # 🔔 ផ្ញើសារប្រកាស Remove ក្នុង Group (Tag Mention ទៅសាមីខ្លួន)
             ban_msg = await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"🚫 **ប្រព័ន្ធបាន Remove {user_mention} ចេញពី Group!**\n\n"
@@ -185,7 +175,6 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 parse_mode='Markdown'
             )
 
-            # 🚨 ផ្ញើ Log រាយការណ៍ពីការ BAN/REMOVE ទៅ Admin
             log_text = (
                 f"🚨 **[LOG REPORT] បាន REMOVE / BAN សមាជិក!**\n"
                 f"👥 **Group:** {chat_title}\n"
@@ -196,7 +185,6 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            # ⏱️ រង់ចាំ ១២០ វិនាទី (២ នាទី) ទើបលុបសារ Remove ចោល
             await asyncio.sleep(60)
             await ban_msg.delete()
 
@@ -212,11 +200,8 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_content = message.text or message.caption or ""
     today_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d")
 
-    # ----------------------------------------------------
-    # 🔍 1. ការត្រួតពិនិត្យបទល្មើស (កូដសុវត្ថិភាព)
-    # ----------------------------------------------------
+    # 1. ការត្រួតពិនិត្យបទល្មើស
     if not await is_admin(update, context):
-        # 1.1 ស្កែន File/រូបភាព/វីដេអូ ដដែលៗក្នុងថ្ងៃតែមួយ (Duplicate Check)
         file_unique_id = None
         if message.document:
             file_unique_id = message.document.file_unique_id
@@ -232,34 +217,27 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 sent_files_history[file_unique_id] = today_str
 
-        # 1.2 ស្កែន File មេរោគ (.exe, .apk...)
         if message.document:
             file_name = message.document.file_name.lower() if message.document.file_name else ""
             if file_name.endswith(DANGEROUS_EXTENSIONS):
                 await process_violation(update, context, f"ផ្ញើ File មានហានិភ័យ/មេរោគ (`{file_name}`)")
                 return
 
-        # 1.3 ស្កែន Link ស្ពែម
         if re.search(URL_REGEX, text_content):
             await process_violation(update, context, "ផ្ញើ Link ស្ពែមចូលក្នុង Group")
             return
 
-        # 1.4 ស្កែនពាក្យអាសអាភាស
         if any(bad_word in text_content.lower() for bad_word in BAD_WORDS):
             await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
             return
 
-    # ----------------------------------------------------
-    # 📁 2. ប្រមូលឯកសារស្វ័យប្រវត្តិ (Silent Archive)
-    # ----------------------------------------------------
-    # ប្រសិនបើ File នោះសុវត្ថិភាព (មិនល្មើសច្បាប់) នោះ Bot នឹងលួច Save ទុកស្ងាត់ៗ
+    # 2. ប្រមូលឯកសារស្វ័យប្រវត្តិ (Silent Archive)
     await auto_archive_file(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🛡️ Anti-Virus & File Archive Bot កំពុងការពារ Group និងប្រមូលឯកសារស្វ័យប្រវត្តិ!")
 
 async def main():
-    # ⚠️ API TOKEN របស់ Bot
     TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
 
     threading.Thread(target=run_flask, daemon=True).start()
