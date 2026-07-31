@@ -235,7 +235,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await auto_archive_file(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🛡️ Anti-Virus Bot កំពុងការពារ Group! ទូរសព្ទគាំទ្រលេខ៖ 123")
+    await update.message.reply_text("🛡️ Anti-Virus Bot កំពុងការពារ Group!បង្កើតឡើងដោយ ឡេង ប៊ុនធឿន ទូរសព្ទ៖ 089976679")
 
 async def main():
     TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
