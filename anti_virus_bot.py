@@ -199,7 +199,7 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            await asyncio.sleep(120)
+            await asyncio.sleep(60)
             await warn_msg.delete()
 
         else:
