@@ -12,7 +12,7 @@ from telegram.ext import (
     ContextTypes, filters
 )
 
-# --- Web Server សម្រាប់ Render Free Plan ---
+# --- Web Server សម្រាប់ Render / Hosting ---
 web_app = Flask('')
 
 @web_app.route('/')
@@ -30,14 +30,15 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# 🔑 Configuration System
-LOG_CHAT_ID = 2127600841  # ID របស់ Log Channel/Group សម្រាប់រាយការណ៍ការល្មើស
+# 🔑 Configuration System ( Recommend fetching from Environment Variables )
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc")
+LOG_CHAT_ID = int(os.environ.get("LOG_CHAT_ID", 2127600841))
 
-# 📁 Configuration សម្រាប់កន្លែងផ្ទុក (Archive Channels ទាំង ៤)
-DOCS_ARCHIVE_CHANNEL_ID = -1004493775116   # 1️⃣ Channel សម្រាប់តែ ឯកសារ (PDF, Doc,...)
-MEDIA_ARCHIVE_CHANNEL_ID = -1004478811243  # 2️⃣ Channel សម្រាប់តែ រូបភាព និង វីដេអូ
-TEXT_ARCHIVE_CHANNEL_ID = -1004463667802   # 3️⃣ Channel សម្រាប់តែ សារជាអក្សរ
-VOICE_ARCHIVE_CHANNEL_ID = -1003937744382  # 4️⃣ Channel សម្រាប់តែ សារជាសម្លេង/Audio (សូមប្តូរ ID នេះ)
+# 📁 Configuration សម្រាប់កន្លែងផ្ទុក Archive Channels
+DOCS_ARCHIVE_CHANNEL_ID = int(os.environ.get("DOCS_ARCHIVE_ID", -1004493775116))
+MEDIA_ARCHIVE_CHANNEL_ID = int(os.environ.get("MEDIA_ARCHIVE_ID", -1004478811243))
+TEXT_ARCHIVE_CHANNEL_ID = int(os.environ.get("TEXT_ARCHIVE_ID", -1004463667802))
+VOICE_ARCHIVE_CHANNEL_ID = int(os.environ.get("VOICE_ARCHIVE_ID", -1003937744382))
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
@@ -60,7 +61,7 @@ CAMBODIA_TZ = pytz.timezone('Asia/Phnom_Penh')
 
 async def send_log_to_admin(context: ContextTypes.DEFAULT_TYPE, log_message: str):
     """ មុខងារផ្ញើ Log Report ទៅកាន់ Admin/Channel """
-    if LOG_CHAT_ID and LOG_CHAT_ID != -1001234567890:
+    if LOG_CHAT_ID:
         try:
             await context.bot.send_message(
                 chat_id=LOG_CHAT_ID, 
@@ -85,7 +86,7 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         return False
 
 async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ 👋 មុខងារស្វាគមន៍សមាជិកថ្មី និងរំលឹកពីបទបញ្ជាក្រុម (Auto-Delete ក្នុង ១ នាទី) """
+    """ 👋 មុខងារស្វាគមន៍សមាជិកថ្មី និងរំលឹកពីបទបញ្ជាក្រុម """
     message = update.message
     
     if message.new_chat_members:
@@ -129,13 +130,9 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 logging.error(f"Failed to send welcome message: {e}")
 
 async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ 📁 មុខងារប្រមូល និងរក្សាទុក ឯកសារ, រូបភាព/វីដេអូ, សារជាអក្សរ និងសារជាសម្លេង ទៅកាន់ Channel ទាំង ៤ ដាច់ដោយឡែកពីគ្នា """
+    """ 📁 មុខងារប្រមូល និងរក្សាទុក ឯកសារ, រូបភាព/វីដេអូ, សារជាអក្សរ និងសារជាសម្លេង """
     message = update.message
-    if not message: 
-        return
-
-    # កុំ Archive បើសារនោះជា COMMAND (ដូចជា /start)
-    if message.text and message.text.startswith('/'): 
+    if not message or (message.text and message.text.startswith('/')): 
         return
 
     user = message.from_user
@@ -144,7 +141,6 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_title = update.effective_chat.title or "Group"
     time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
     
-    # ព័ត៌មានដើមរបស់អ្នកផ្ញើ
     base_info = (
         f"👥 **Group៖** {chat_title}\n"
         f"👤 **អ្នកផ្ញើ៖** {user_name} ({user_handle})\n"
@@ -152,8 +148,8 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
         f"⏰ **កាលបរិច្ឆេទ៖** {time_str}"
     )
 
-    # --- ករណីទី ១៖ ជា File ឯកសារ (Document) ---
-    if message.document and DOCS_ARCHIVE_CHANNEL_ID and DOCS_ARCHIVE_CHANNEL_ID != -1001234567890:
+    # 1. Document Archive
+    if message.document and DOCS_ARCHIVE_CHANNEL_ID:
         file_name = message.document.file_name.lower() if message.document.file_name else ""
         if file_name.endswith(DANGEROUS_EXTENSIONS): 
             return
@@ -166,12 +162,11 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         try:
             await message.copy(chat_id=DOCS_ARCHIVE_CHANNEL_ID, caption=archive_caption, parse_mode='Markdown')
-            logging.info(f"Archived document to Docs Channel from user {user.id}")
         except Exception as e:
             logging.error(f"Failed to copy file to Docs Archive Channel: {e}")
 
-    # --- ករណីទី ២៖ ជា រូបថត ឬ វីដេអូ (Photo or Video) ---
-    elif (message.photo or message.video) and MEDIA_ARCHIVE_CHANNEL_ID and MEDIA_ARCHIVE_CHANNEL_ID != -100447881124:
+    # 2. Photo/Video Archive
+    elif (message.photo or message.video) and MEDIA_ARCHIVE_CHANNEL_ID:
         media_type = "រូបថត" if message.photo else "វីដេអូ"
         archive_caption = (
             f"🖼️ **[ប្រមូល{media_type}ស្វ័យប្រវត្តិ]**\n\n"
@@ -180,12 +175,11 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         try:
             await message.copy(chat_id=MEDIA_ARCHIVE_CHANNEL_ID, caption=archive_caption, parse_mode='Markdown')
-            logging.info(f"Archived {media_type} to Media Channel from user {user.id}")
         except Exception as e:
             logging.error(f"Failed to copy {media_type} to Media Archive Channel: {e}")
 
-    # --- ករណីទី ៣៖ ជា សារជាសម្លេង (Voice Note) ឬ ឯកសារសំឡេង (Audio) ---
-    elif (message.voice or message.audio) and VOICE_ARCHIVE_CHANNEL_ID and VOICE_ARCHIVE_CHANNEL_ID != -1003937744382:
+    # 3. Voice/Audio Archive
+    elif (message.voice or message.audio) and VOICE_ARCHIVE_CHANNEL_ID:
         voice_type = "សារជាសម្លេង (Voice Note)" if message.voice else "ឯកសារសម្លេង (Audio File)"
         archive_caption = (
             f"🎙️ **[ប្រមូល{voice_type}ស្វ័យប្រវត្តិ]**\n\n"
@@ -194,12 +188,11 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         try:
             await message.copy(chat_id=VOICE_ARCHIVE_CHANNEL_ID, caption=archive_caption, parse_mode='Markdown')
-            logging.info(f"Archived voice/audio message to Voice Channel from user {user.id}")
         except Exception as e:
             logging.error(f"Failed to copy voice message to Voice Archive Channel: {e}")
 
-    # --- ករណីទី ៤៖ ជា សារជាអក្សរ (Text Message Only) ---
-    elif message.text and TEXT_ARCHIVE_CHANNEL_ID and TEXT_ARCHIVE_CHANNEL_ID != -1004463667802:
+    # 4. Text Archive
+    elif message.text and TEXT_ARCHIVE_CHANNEL_ID:
         text_archive_content = (
             f"💬 **[ប្រមូលសារជាអក្សរស្វ័យប្រវត្តិ]**\n\n"
             f"{base_info}\n\n"
@@ -211,7 +204,6 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
                 text=text_archive_content,
                 parse_mode='Markdown'
             )
-            logging.info(f"Archived text message to Text Channel from user {user.id}")
         except Exception as e:
             logging.error(f"Failed to archive text message: {e}")
 
@@ -227,7 +219,6 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     user_id = user.id
     user_name = user.full_name
     user_handle = f"@{user.username}" if user.username else "គ្មាន Username"
-    
     user_mention = f"[{user_name}](tg://user?id={user_id})"
     time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
@@ -297,7 +288,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
-    # 👋 ១. ពិនិត្យមើល និងស្វាគមន៍សមាជិកថ្មី
+    # ១. ពិនិត្យមើល និងស្វាគមន៍សមាជិកថ្មី
     if message.new_chat_members:
         await welcome_new_member(update, context)
         return
@@ -305,9 +296,14 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_content = message.text or message.caption or ""
     today_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d")
 
-    # 🔍 ២. ការត្រួតពិនិត្យបទល្មើស (កុំពិនិត្យ Admin)
+    # ២. ការត្រួតពិនិត្យបទល្មើស (កុំពិនិត្យ Admin)
     if not await is_admin(update, context):
-        # ស្កែនរក Spam File/Photo/Video/Audio (ដោយប្រើ unique_id)
+        # Clean older entries from file history map to manage memory
+        keys_to_delete = [k for k, v in sent_files_history.items() if v != today_str]
+        for k in keys_to_delete:
+            del sent_files_history[k]
+
+        # ស្កែនរក Spam File/Photo/Video/Audio
         file_unique_id = None
         if message.document:
             file_unique_id = message.document.file_unique_id
@@ -344,7 +340,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
             return
 
-    # 📁 ៣. ប្រមូលខ្លឹមសារស្វ័យប្រវត្តិទៅតាម Channel នីមួយៗ (Silent Archive)
+    # ៣. ប្រមូលខ្លឹមសារស្វ័យប្រវត្តិទៅតាម Channel នីមួយៗ
     await auto_archive_content(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -358,25 +354,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def main():
-    # 🔑 Bot Token
-    TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
-
-    # ចាប់ផ្តើម Web Server ក្នុង Thread ផ្សេង
+    # Start Flask Web Server in a separate daemon thread
     threading.Thread(target=run_flask, daemon=True).start()
 
-    # បង្កើត Application
-    app = ApplicationBuilder().token(TOKEN).build()
+    # Application Setup
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # បន្ថែម Handlers
-    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, monitor_messages))
+    # Register Handlers
     app.add_handler(CommandHandler('start', start))
+    app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, monitor_messages))
 
-    # រៀបចំ និងចាប់ផ្តើម Bot
+    # Bot Startup Process
     await app.initialize()
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
     
-    # រក្សា Bot ឱ្យដំណើរការរហូត
+    # Keep the bot running
     await asyncio.Event().wait()
 
 if __name__ == '__main__':
