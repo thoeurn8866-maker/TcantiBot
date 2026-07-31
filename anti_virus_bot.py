@@ -79,15 +79,57 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
         logging.error(f"Error checking admin status: {e}")
         return False
 
+async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ 👋 មុខងារស្វាគមន៍សមាជិកថ្មី និងរំលឹកពីបទបញ្ជាក្រុម (Auto-Delete ក្នុង ២ នាទី) """
+    message = update.message
+    
+    if message.new_chat_members:
+        for new_member in message.new_chat_members:
+            if new_member.is_bot:
+                continue
+
+            user_name = new_member.full_name
+            user_id = new_member.id
+            user_mention = f"[{user_name}](tg://user?id={user_id})"
+            chat_title = update.effective_chat.title or "Group"
+            time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+
+            welcome_text = (
+                f"👋 **សូមស្វាគមន៍ {user_mention} មកកាន់ {chat_title}!**\n\n"
+                f"ដើម្បីរក្សាសុវត្ថិភាព និងរបៀបរៀបរយក្នុង Group សូមសមាជិកមេត្តាជ្រាបពី **បទបញ្ជាសុវត្ថិភាព** ដូចខាងក្រោម៖\n\n"
+                f"🚫 **ហាមផ្ញើ Link/URL ស្ពែម ឬ Link គ្មានប្រភពច្បាស់លាស់**\n"
+                f"🚫 **ហាមផ្ញើ File មេរោគ ឬ Executable Files (.exe, .apk, .zip, ...)**\n"
+                f"🚫 **ហាមផ្ញើរូបភាព/សារដដែលៗ (Spam) និងពាក្យអសុរោះ/អាសអាភាស**\n\n"
+                f"⚠️ *(ប្រព័ន្ធការពារនឹងព្រមាន ឬ Remove ចេញពី Group ស្វ័យប្រវត្តិប្រសិនបើមានការល្មើស)*\n\n"
+                f"⏰ **កាលបរិច្ឆេទ៖** {time_str}\n"
+                f"*(សារស្វាគមន៍នេះនឹងត្រូវលុបស្វ័យប្រវត្តិក្នុងរយៈពេល ១ នាទី)*"
+            )
+
+            try:
+                sent_msg = await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=welcome_text,
+                    parse_mode='Markdown'
+                )
+
+                await asyncio.sleep(60)
+                await sent_msg.delete()
+                
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+
+            except Exception as e:
+                logging.error(f"Failed to send welcome message: {e}")
+
 async def auto_archive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ 📁 មុខងារប្រមូល និងរក្សាទុកតែ File ឯកសារស្វ័យប្រវត្តិក្នុង Archive Channel (Silent Storage) """
     message = update.message
     
-    # ✅ កែប្រែឈ្មោះ Variable ឱ្យត្រូវគ្នាជាមួយ DOCS_ARCHIVE_CHANNEL_ID
     if not DOCS_ARCHIVE_CHANNEL_ID or DOCS_ARCHIVE_CHANNEL_ID == -1001234567890:
         return
 
-    # ✅ ចាប់យកតែសារណាដែលជា File Document តែប៉ុណ្ណោះ (Word, Excel, PDF, ផ្សេងៗ)
     if message.document:
         user = message.from_user
         user_name = user.full_name
@@ -96,7 +138,6 @@ async def auto_archive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         time_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d %H:%M:%S")
         file_name = message.document.file_name or "ឯកសារគ្មានឈ្មោះ"
 
-        # បង្កើតអត្ថបទព័ត៌មានភ្ជាប់ជាមួយ File ក្នុង Archive Channel
         archive_caption = (
             f"📄 **[ប្រមូលឯកសារស្វ័យប្រវត្តិ]**\n\n"
             f"📁 **ឈ្មោះ File៖** `{file_name}`\n"
@@ -108,7 +149,6 @@ async def auto_archive_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         try:
-            # 🤫 Copy ឯកសារផ្ញើទៅកាន់ Archive Channel ដោយស្ងាត់ៗ (Silent)
             await message.copy(
                 chat_id=DOCS_ARCHIVE_CHANNEL_ID,
                 caption=archive_caption,
@@ -197,10 +237,15 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
+    # 👋 ១. ពិនិត្យមើល និងស្វាគមន៍សមាជិកថ្មី
+    if message.new_chat_members:
+        await welcome_new_member(update, context)
+        return
+
     text_content = message.text or message.caption or ""
     today_str = datetime.now(CAMBODIA_TZ).strftime("%Y-%m-%d")
 
-    # 1. ការត្រួតពិនិត្យបទល្មើស
+    # 🔍 ២. ការត្រួតពិនិត្យបទល្មើស
     if not await is_admin(update, context):
         file_unique_id = None
         if message.document:
@@ -231,11 +276,11 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await process_violation(update, context, "ប្រើប្រាស់ពាក្យពេចន៍/សារអាសអាភាស")
             return
 
-    # 2. ប្រមូលឯកសារស្វ័យប្រវត្តិ (Silent Archive)
+    # 📁 ៣. ប្រមូលឯកសារស្វ័យប្រវត្តិ (Silent Archive)
     await auto_archive_file(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🛡️ Anti-Virus Bot កំពុងការពារ Group!បង្កើតឡើងដោយ ឡេង ប៊ុនធឿន ទូរសព្ទ៖ 089976679")
+    await update.message.reply_text("🛡️ Anti-Virus Bot កំពុងការពារ Group! បង្កើតឡើងដោយ ឡេង ប៊ុនធឿន ទូរសព្ទ៖ 089976679")
 
 async def main():
     TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
