@@ -171,7 +171,7 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
             logging.error(f"Failed to copy file to Docs Archive Channel: {e}")
 
     # --- ករណីទី ២៖ ជា រូបថត ឬ វីដេអូ (Photo or Video) ---
-    elif (message.photo or message.video) and MEDIA_ARCHIVE_CHANNEL_ID and MEDIA_ARCHIVE_CHANNEL_ID != -100XXXXXXXXXX:
+    elif (message.photo or message.video) and MEDIA_ARCHIVE_CHANNEL_ID and MEDIA_ARCHIVE_CHANNEL_ID != -100447881124:
         media_type = "រូបថត" if message.photo else "វីដេអូ"
         archive_caption = (
             f"🖼️ **[ប្រមូល{media_type}ស្វ័យប្រវត្តិ]**\n\n"
@@ -185,7 +185,7 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
             logging.error(f"Failed to copy {media_type} to Media Archive Channel: {e}")
 
     # --- ករណីទី ៣៖ ជា សារជាសម្លេង (Voice Note) ឬ ឯកសារសំឡេង (Audio) ---
-    elif (message.voice or message.audio) and VOICE_ARCHIVE_CHANNEL_ID and VOICE_ARCHIVE_CHANNEL_ID != -100XXXXXXXXXX:
+    elif (message.voice or message.audio) and VOICE_ARCHIVE_CHANNEL_ID and VOICE_ARCHIVE_CHANNEL_ID != -1003937744382:
         voice_type = "សារជាសម្លេង (Voice Note)" if message.voice else "ឯកសារសម្លេង (Audio File)"
         archive_caption = (
             f"🎙️ **[ប្រមូល{voice_type}ស្វ័យប្រវត្តិ]**\n\n"
@@ -199,7 +199,7 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
             logging.error(f"Failed to copy voice message to Voice Archive Channel: {e}")
 
     # --- ករណីទី ៤៖ ជា សារជាអក្សរ (Text Message Only) ---
-    elif message.text and TEXT_ARCHIVE_CHANNEL_ID and TEXT_ARCHIVE_CHANNEL_ID != -100XXXXXXXXXX:
+    elif message.text and TEXT_ARCHIVE_CHANNEL_ID and TEXT_ARCHIVE_CHANNEL_ID != -1004463667802:
         text_archive_content = (
             f"💬 **[ប្រមូលសារជាអក្សរស្វ័យប្រវត្តិ]**\n\n"
             f"{base_info}\n\n"
