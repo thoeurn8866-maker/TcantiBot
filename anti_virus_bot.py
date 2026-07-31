@@ -32,7 +32,7 @@ logging.basicConfig(
 
 # 🔑 Configuration System
 LOG_CHAT_ID = 2127600841  # ID របស់ Log Channel/Group សម្រាប់រាយការណ៍ការល្មើស
-ARCHIVE_CHANNEL_ID = -1004493775116  # ⚠️ ដាក់ ID របស់ Archive Channel (Private Channel) របស់បងនៅទីនេះ
+DOCS_ARCHIVE_CHANNEL_ID = -1004493775116  # ⚠️ ដាក់ ID របស់ Archive Channel (Private Channel) របស់បងនៅទីនេះ
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
