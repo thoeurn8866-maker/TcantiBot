@@ -235,7 +235,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await auto_archive_file(update, context)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🛡️ Anti-Virus & File Archive Bot កំពុងការពារ Group និងប្រមូលឯកសារស្វ័យប្រវត្តិ!")
+    await update.message.reply_text("🛡️ Anti-Virus & File Archive Bot កំពុងការពារ Group!")
 
 async def main():
     TOKEN = '8950817942:AAFvAnahRVijtETT246VqlLp5s23XA7-xHc'
