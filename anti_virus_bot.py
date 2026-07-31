@@ -33,10 +33,11 @@ logging.basicConfig(
 # 🔑 Configuration System
 LOG_CHAT_ID = 2127600841  # ID របស់ Log Channel/Group សម្រាប់រាយការណ៍ការល្មើស
 
-# 📁 Configuration សម្រាប់កន្លែងផ្ទុក (Archive Channels ទាំង ៣)
+# 📁 Configuration សម្រាប់កន្លែងផ្ទុក (Archive Channels ទាំង ៤)
 DOCS_ARCHIVE_CHANNEL_ID = -1004493775116   # 1️⃣ Channel សម្រាប់តែ ឯកសារ (PDF, Doc,...)
 MEDIA_ARCHIVE_CHANNEL_ID = -1004478811243  # 2️⃣ Channel សម្រាប់តែ រូបភាព និង វីដេអូ
-TEXT_ARCHIVE_CHANNEL_ID = -1004463667802   # 3️⃣ Channel សម្រាប់តែ សារជាអក្សរ (សូមប្តូរ ID នេះ)
+TEXT_ARCHIVE_CHANNEL_ID = -1004463667802   # 3️⃣ Channel សម្រាប់តែ សារជាអក្សរ
+VOICE_ARCHIVE_CHANNEL_ID = -1003937744382  # 4️⃣ Channel សម្រាប់តែ សារជាសម្លេង/Audio (សូមប្តូរ ID នេះ)
 
 # 🚫 ប្រភេទ File មេរោគ
 DANGEROUS_EXTENSIONS = (
@@ -128,7 +129,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 logging.error(f"Failed to send welcome message: {e}")
 
 async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ 📁 មុខងារប្រមូល និងរក្សាទុក ឯកសារ, រូបភាព/វីដេអូ, និងសារជាអក្សរ ទៅកាន់ Channel ទាំង ៣ ដាច់ដោយឡែកពីគ្នា """
+    """ 📁 មុខងារប្រមូល និងរក្សាទុក ឯកសារ, រូបភាព/វីដេអូ, សារជាអក្សរ និងសារជាសម្លេង ទៅកាន់ Channel ទាំង ៤ ដាច់ដោយឡែកពីគ្នា """
     message = update.message
     if not message: 
         return
@@ -183,7 +184,21 @@ async def auto_archive_content(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             logging.error(f"Failed to copy {media_type} to Media Archive Channel: {e}")
 
-    # --- ករណីទី ៣៖ ជា សារជាអក្សរ (Text Message Only) ---
+    # --- ករណីទី ៣៖ ជា សារជាសម្លេង (Voice Note) ឬ ឯកសារសំឡេង (Audio) ---
+    elif (message.voice or message.audio) and VOICE_ARCHIVE_CHANNEL_ID and VOICE_ARCHIVE_CHANNEL_ID != -100XXXXXXXXXX:
+        voice_type = "សារជាសម្លេង (Voice Note)" if message.voice else "ឯកសារសម្លេង (Audio File)"
+        archive_caption = (
+            f"🎙️ **[ប្រមូល{voice_type}ស្វ័យប្រវត្តិ]**\n\n"
+            f"{base_info}\n"
+            f"📝 **Caption ដើម៖** {message.caption or 'គ្មាន'}"
+        )
+        try:
+            await message.copy(chat_id=VOICE_ARCHIVE_CHANNEL_ID, caption=archive_caption, parse_mode='Markdown')
+            logging.info(f"Archived voice/audio message to Voice Channel from user {user.id}")
+        except Exception as e:
+            logging.error(f"Failed to copy voice message to Voice Archive Channel: {e}")
+
+    # --- ករណីទី ៤៖ ជា សារជាអក្សរ (Text Message Only) ---
     elif message.text and TEXT_ARCHIVE_CHANNEL_ID and TEXT_ARCHIVE_CHANNEL_ID != -100XXXXXXXXXX:
         text_archive_content = (
             f"💬 **[ប្រមូលសារជាអក្សរស្វ័យប្រវត្តិ]**\n\n"
@@ -292,7 +307,7 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🔍 ២. ការត្រួតពិនិត្យបទល្មើស (កុំពិនិត្យ Admin)
     if not await is_admin(update, context):
-        # ស្កែនរក Spam File/Photo (ដោយប្រើ unique_id)
+        # ស្កែនរក Spam File/Photo/Video/Audio (ដោយប្រើ unique_id)
         file_unique_id = None
         if message.document:
             file_unique_id = message.document.file_unique_id
@@ -300,10 +315,14 @@ async def monitor_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
             file_unique_id = message.photo[-1].file_unique_id
         elif message.video:
             file_unique_id = message.video.file_unique_id
+        elif message.voice:
+            file_unique_id = message.voice.file_unique_id
+        elif message.audio:
+            file_unique_id = message.audio.file_unique_id
 
         if file_unique_id:
             if file_unique_id in sent_files_history and sent_files_history[file_unique_id] == today_str:
-                await process_violation(update, context, "ផ្ញើរូបភាព/វីដេអូ ឬ ឯកសារដដែលៗ (Spam) ក្នុងថ្ងៃតែមួយ")
+                await process_violation(update, context, "ផ្ញើសារ/រូបភាព/សម្លេង/ឯកសារដដែលៗ (Spam) ក្នុងថ្ងៃតែមួយ")
                 return
             else:
                 sent_files_history[file_unique_id] = today_str
