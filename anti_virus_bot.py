@@ -106,7 +106,7 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
                 text=f"⚠️ **សារព្រមានលើកទី {current_warns}/3!**\n"
                      f"👤 **សមាជិក៖** {user_name}\n"
                      f"📌 **មូលហេតុ៖** {reason}\n\n"
-                     f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!)*"
+                     f"*(ប្រសិនបើប្រព្រឹត្តល្មើសដល់លើកទី ៣ ប្រព័ន្ធនឹង Remove ចេញពី Group ស្វ័យប្រវត្តិ!)*\n"
                      f"*(នាយកដ្ឋានរដ្ឋបាលនិងធនធានមនុស្សនៃទូរគមនាគមន៍កម្ពុជា)*"
             )
 
@@ -148,7 +148,7 @@ async def process_violation(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             )
             await send_log_to_admin(context, log_text)
 
-            await asyncio.sleep(60)
+            await asyncio.sleep(120)
             await ban_msg.delete()
 
     except Exception as e:
